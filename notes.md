@@ -1162,3 +1162,185 @@ for (int i = 0; i < 10; i++){
 
 * few names, but a lot of different variables
 * each current scope has one Scope class
+
+# Private / internal interfaces
+```cs
+public I1 {
+    void m();
+}
+
+internal I2 {
+    void f();
+}
+
+public class A : I1, I2 {
+    public void m() {
+        ...
+    }
+
+    public void f() {
+        ...
+    }
+}
+
+// or, if dont want f() as a public API
+
+public class A : I1, I2 {
+    public void m() {
+        ...
+    }
+
+    void I2.f() {
+        ...
+    }
+}
+
+// and now only those who see I2 can access f() 
+```
+
+# Namespaces
+* module to put things together
+* only a shortcut
+
+```cs
+namespace A {
+    namespace B {
+        class C {
+
+        }
+    }
+}
+```
+
+* its just shortcut for
+```cs
+A.B.C
+```
+
+* it's just syntactic sugar
+
+## Current context
+```cs
+namespace A {
+
+    namespace B {
+        class C {
+            // current context of C is B
+        }
+
+        class D {
+            // current context of D is B
+        }
+
+        class E {
+            public void f() {
+                G g = new G();
+            }
+        }
+    }
+
+    class G {
+        // this gets called in f
+    }
+
+class Program {
+    static void main(string[] args) {
+        // current context is A
+    }
+}
+```
+
+* current context is the closest namespace
+* searching of some entity (namespace, class, struct) goes from current context, to higher context and so on to root
+
+## Global context
+* `global::...` is default root
+* Aliases : Global by default
+    * you can unset
+
+## Using
+* imports types not namespaces!
+
+# Nested Types
+* .NET knows about this hierarchy, unlike in namespaces
+
+```cs
+namespace N {
+    class A {
+        class B {
+
+        }
+    }
+}
+```
+
+* on CLR level, name of B is
+    * N.A + B
+    * ToString() calls would yield such a result
+
+* but as a programmer, you would access B as N.A.B
+
+* in JAVA, B would have a reference for A, but in C# this doesnt hold at all
+
+## When to use
+* use when B is internal detail of A
+
+```cs
+public class A {
+
+}
+
+internal class B {
+
+}
+```
+* still can be seen in current assembly
+
+```cs
+public class A {
+    private class B {
+
+    }
+}
+```
+
+* nobody can see this class
+* eg when B is implementation detail of A (A is some data structure that uses red-black tree, B is node of this tree) or enumerator 
+
+* Access is given syntactically
+
+# Private contract
+```cs
+public class C {
+    // this defines the private contract between C and D
+    private interface I3 {
+        void g();
+    }
+
+    // I1 can be some public interface
+    public class D : I1, I3 {
+        // I1 method
+        public void f() {
+            ...
+        }
+
+        // private contract implementation
+        void I3.g() {
+            ...
+        }
+    }
+
+    ...
+    public void usePrivateContractMethodInternally() {
+        I3 x = new C.D();
+        
+        // g() can be called only by those who can access I3 iterface, but this is only class C
+        x.g();
+    }
+}
+```
+
+# Enumerator
+* IEnumerable interface
+    * implements enumerator method
+    * and many more
