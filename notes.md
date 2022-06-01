@@ -455,6 +455,9 @@ public T Max<T>(T t1, T t2) where T : IComparable {
 * at CIL code level, there is only one generic class
 * whenever in source code is used (written eg A<int>, note that it doesnt have to be declaration or instantiation!) a concrete specialization of this generic class, the implementation (machine code of this class) is created (JIT) (in C, again, AOT, everything is always recompiled)
 
+* its actually not that simple, if the parameter is value type, than this is true, but
+    * if the parameter is reference type, then there is only one implmementation of the class, that specializes for all the possible reference constraints
+
 ### Independence
 * as in generic methods, generic types are completely independent of each other
 
@@ -703,6 +706,8 @@ public class A {
 ```
 
 ## Contravariance in C#
+* array of value types is contravariant
+    * value can be anything, but reference has still the same structure
 * read is not okay
 * write is okay
 
@@ -721,6 +726,203 @@ s = o;
 * on the other hand, we cannot read, because we might get something "better" than string, something that is an ancestor of object
 
 
+## Interfaces are variant
+* that means, we can set each parameter to define covariance, contravariance or invariance
+
+```cs
+// covariant, invariant, contravariant, contravariant
+interface I<out T1, T2, in T3, in T4> {
+
+}
+
+I<A,B,C,D> i = new X();
+
+// what can X be?
+
+class X : I<E,F,G,H> {
+
+}
+```
+* where:
+    * E is child of A
+    * F is equal B
+    * G is parent of C
+    * H is parent of D
+
+* the reason is, that somewhere in I, there is method that returns T1 (getter), some method that has as input parameter T3 or T4 (setters) and some method that could have both input and return type set to T2
+
+### Examples
+1. IList<T>
+    * has to be invariant, because it allows for read/write
+
+2. IReadOnlyList<out T>
+    * only read is performed, hence is covariant 
 
 
+# Interfaces
+## Differences between abstract classes
+### interface
+* can implement multiple interfaces
+    * doesnt have any data
+    * inheriting multiple methods is not a problem
+* define contract
+* extensibility is optional
+    * opt-in
+        * virtual / abstract ...
 
+### Abstract class
+* doesnt support multiple inheritance
+    * diamond problem
+    * problem with inheriting data
+* define contract
+* promise extensibility in future
+    * opt-out
+        * sealed override
+
+## When what to use?
+* use abstract class when data is needed
+* use abstract class for non public contract
+    * protected, private, internal
+* use interface for multiple inheritance
+
+
+## Virtual methods table
+* is filled at compile time
+* each class has its own table
+* instance has reference to its type (GetType())
+* this type has reference to its class virtual methods table
+* `virtual` makes new record in this table
+* `override` overrides this record with new implementation
+
+## Interface methods table
+* class remembers it whenever it implements some interface
+* for the interface, it is empty
+* the reference doesnt point to concrete methods machine code, by rather on the method istelf (double dereference)
+
+* eg 
+```cs
+interface I {
+    public void m();
+    public void l();
+}
+
+public class A : I {
+    public virtual void m() {
+        ...
+    }
+
+    public void l() {
+        ...
+    }
+}
+
+```
+
+* interface table for `A` has record for m's implementation pointing to virtual methods table (m is virtual) of A
+* l's implementation is pointing to normal list of methdos of A
+
+```cs
+public class B : A {
+    public override void m() {
+        ...
+    } 
+}
+```
+* B's virtual methods table's record for m is now overriden 
+
+```cs
+A a = new B();
+
+// what gets called?
+a.m();
+
+// override in B - easy
+
+A a = new A();
+a.m();
+
+// virtual function living in A
+
+// we havent need interface method table in these examples
+
+// how about now?
+I x = new A(); 
+x.m();
+
+// it just depends on the instance, hence the virtual version of m is executed
+```
+
+* now interface method table is necessary
+* JIT checks interface method table for class A
+    * for class A, becuase x is instance of A (reference is in type (GetType()))
+* in this table, he finds, that m is living in A as a virtual method (in VMT), finds its machine code (or generates it) and executes the function
+* double reference
+
+```cs
+A a = new B();
+I x = a;
+// what happens now?
+x.m();
+```
+
+* interface methods are inherited, that means, it is filled the same way as in the parent
+
+* when the interface is implemented once again in some child, it is not inherited, but the interface method table is filled once again
+
+```cs
+// if B was implemented like this
+// no change, table is filled the same way as in parent
+class B : A, I {
+    public override void m() {
+        ...
+    }
+}
+
+// still no change, l was already implemented at A
+class B : A {
+    public override void m() {
+        ...
+    }
+
+    public void l() {
+
+    }
+}
+
+I x = new B();
+x.l();      // calls A method l
+
+
+// interface method table is different now, because l is new
+class B : A, I {
+    public override void m() {
+        ...
+    }
+
+    public void l() {
+        ...
+    }
+}
+
+I x = new B();
+x.l(); // calls B method l
+```
+
+### Summary
+* if not interface handler
+    * get instance type and there is reference on:
+        * normal methods list
+        * virtual methods table
+    * finds record of called method either in VMT or normal methods list
+    * execute
+
+* if interface handler
+    * get instance type and it's interface methods table
+    * there is reference on method (not machine code) that implements it
+        * can be either to VMT or normal methods list
+    * execute
+
+* interface method table is inherited (if not explicit implementation in child)
+    * it is the same for child as for parent
+
+* interface method table is initialized (filled) every time we implement the coresponding interface
