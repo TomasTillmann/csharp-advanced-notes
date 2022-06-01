@@ -1344,3 +1344,14 @@ public class C {
 * IEnumerable interface
     * implements enumerator method
     * and many more
+
+* type that implements IEnumerable interface can be enumerated
+```cs
+IEnumerable enumerable;
+foreach(var x in enumerable) {
+    // much easier access than using MoveNext() etc ...
+}
+```
+
+# Yield return
+* compiler generates state machine of enumerator implementation
