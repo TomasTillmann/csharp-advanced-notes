@@ -926,3 +926,129 @@ x.l(); // calls B method l
     * it is the same for child as for parent
 
 * interface method table is initialized (filled) every time we implement the coresponding interface
+
+# Delegates
+* reference type pointing to a function
+* to what function the delegate can point is restrained by its definition
+* its just a shorthand (syntactic sugar)
+```cs
+delegate int D(string a);
+
+// is shorthand for (not really but this is the idea)
+
+class D : MultiCastDelegate {
+    public int Invoke(string a) {
+        ...
+    }
+}
+```
+
+* delegates are allocated on heap
+
+```cs
+D d = new D(a.m);
+
+// where m is function that obeys constraints of type D
+
+
+d.Invoke("string");
+// is the same as
+d("string");
+```
+
+### Data in delegate
+* remembers pointer to "this" (context of the method) and the method itself
+* if the method is static, then "this" is null
+* is immutable
+    * nice for parallel programming too
+
+```cs
+D d = new D(a.m);
+
+// not allowed - cannot change the context, because it's immutable
+d.this = b;
+d();
+```
+
+* what method to choose is decided at compile time not run time
+* for example, when we assign method from VMT to the delegate, the process of finding the correct implementation is done at compile time, not run time
+* then, when we call the delegate, then we just call the function that the delegate remembers on the remembered context
+
+### Syntactic sugar time
+```cs
+public void m() {
+    ...
+}
+
+// if m is null, does not do anything, if it is not, than it calls m
+a?.m();
+
+// if the method wasnt assigned to the delegate, than it is very useful
+d?.Invoke();
+
+d = new D(m);
+d.Invoke();
+```
+
+## Why Multicast Delegate?
+* can chain delegates together
+
+```cs
+// returns new delegate (immutable)
+D d = Delegate.Combine(d1, d2);
+
+// calls both d1.Invoke() and d2.Invoke(), in this order!
+d.Invoke();
+
+// there is a little parallel with chain of responsibility design pattern
+```
+
+* MulticastDelegate works as a stack
+```cs
+d.Remove();
+// removes the last added
+```
+* can be syntactically shortened
+```cs
+// p = Delegate.Combine(p, a1.f);
+p += a1.f;
+p += a2.f;
+
+// p.Remove(new D(a1.f))
+p -= new D(a1.f);
+p -= new D(a2.f);
+```
+
+## Combine with generic delegates
+* in .NET, there are predefined delegates Action and Func 
+* many overloads
+* Func<T1, T2, ..., TN, TResult>(T1 t1, T2 t2, .. Tn tn)
+* Action<T1, T2, ...>(T1 t1, T2 t2, ...)
+
+## Anonymous method
+```cs
+List list = new List();
+int sum = 0;
+
+// anonymous method
+list.ForAll(delegate (Node p) {sum += p.value; });
+```
+
+# Type inference
+* compiler somehow needs to guess what the delegate is going to return
+* always at compile time!
+```cs
+delegate (int a, int b) {return a + b; }
+```
+
+```cs
+Func<int,int> f1 = x => x + 1;
+Func<int,double> f2 = x => x + 1;
+Func<double,int> f3 = x => x + 1; // error, implicit onversion from double to int doesnt exist
+```
+
+# Lambda functions
+* syntactis shorthand for delegate ( + more)
+```cs
+(int a, int b) => a + b;
+```
