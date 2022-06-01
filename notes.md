@@ -1569,3 +1569,25 @@ foreach(var x in q) {
 * cannot be always lazy
 * eg, OrderBy() cannot be lazy
 * this means, that different queries / different orders can have different efficiency eg OrderBy() can be super slow
+
+# Threads
+* each thread has its own stack
+* data on stack are only seen by this thread
+* data on heap can be shared by many different threads
+    * here all the problems arise (deadlock, race condition, ...)
+
+* the only reason why we would like to use threads is in order to improve performance
+
+```cs
+using System.Threading.Thread
+
+// can pass a delegate there
+var t1 = new Thread(...);
+
+// start the thread - doesnt actually mean that OS will at this instance make this thread running
+t1.Start();
+
+
+// this current thread now waits for t1 to finish (passive waiting)
+t1.Join();
+```
