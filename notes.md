@@ -1355,3 +1355,217 @@ foreach(var x in enumerable) {
 
 # Yield return
 * compiler generates state machine of enumerator implementation
+
+# Anonymous class
+* used by lambda functions for scope classes
+* its just a syntactit shorthand
+
+* this is not anonymous function but it is similiar
+```cs
+X x = new X{a = 5};
+
+// is at CIL level
+
+X x = new X();
+x.a = 5;
+```
+
+* this is an example of anonymous function
+```cs
+new {x = alpha, y = beta};
+
+// is translated to
+
+class Anon1 {
+    // type inference (___ is the infered type from alpha and beta)
+    public ___ x;
+    public ___ y;
+}
+
+new Anon1{x = alpha, y = beta};
+```
+
+```cs
+// what to write on the left side though?
+new {x = alpha, y = beta};
+
+```
+* we dont know the name of anon class
+
+```cs
+// the only way - type inference again
+var anon = new {x = alpha, y = beta};
+```
+
+```cs
+var anon1 = new {x = alpha, y = beta};
+var anon2 = new {y = gama, x = delta};
+
+// anon1 and anon2 are different types
+```
+
+* whenever we create intasnce of new anonymous class, compiler looks if there is already existing anonymous class with same type and same ordering of assignment 
+
+```cs
+var anon1 = new {x = alpha, y = beta};
+var anon2 = new {x = gama, y = delta};
+
+// if alpha and gama are the same type and beta and delta are the same type, anon1 and anon2 are the same anon function - same type
+
+// we can do this then
+
+anon1 = anon2;
+```
+
+* implements ToString() very nicely
+* implements Equals() very nicely
+    * structural comparision
+* doesnt implement IEquitable<T>, thats not so nice
+    * `anon1Instance == anon2instance` cannot be used, only 
+    `anon1instance.Equals(anon2Instance)`
+
+```cs
+// this is also possible
+var a = new {this.GetName(), this.GetAge()};
+```
+* compiler tries to deduce some nice names for its properties
+
+## What are they for?
+* only local variable (var - type inference)
+* cannot be a property or return type or input of a function
+* but!
+```cs
+public void f<T>(T a) {
+    ...
+}
+
+// works!!! - type inference
+f(new {x = 5});
+
+// but its completely useless
+// we can only work with it as object in function f, which is useless ...
+```
+* so it makes sense to use anonymous types only as local variables
+* use when you want some n-tuple of values
+
+# Tuple
+## Tuple<T1, T2, ...>
+* its a class though, thats a huge overhead
+* dont use this
+
+## ValueTuple, ValueTuple<T1, T2, ...>
+* struct
+```cs
+var a = (1,2,3);        // this is ValueTuple
+
+// this is ValueTuple
+public void f((int, int, int) a) {
+
+}
+
+// this is also ValueTupple
+public void g((int a, int b) x) {
+    x.a = //
+
+    // much nicer than
+    x.Item1 = //
+}
+
+// how does CLI know about those names? He keeps attributes around this function, that define the names
+```
+* this is good
+
+
+## What are they used for
+* its mainly used when you want to return many values
+
+```cs
+public (int x, int y) f() {
+    return (1,2);
+}
+
+// type inference very nicely
+var a = f();
+print(a.x);    // not Item1
+print(a.y);
+
+// or
+// deconstruction
+var (x,y) = f();
+print(x);
+print(y);
+
+// overwrite of x and y
+(x,y) = f();
+print(x);
+print(y);
+
+// if we dont care about x for example
+(_, var y) = f();
+```
+
+### Deconstructor
+```cs
+public A {
+    public firstName;
+    public lastName;
+
+    public void Deconstruct(out string firstName, out string lastName) {
+        firstName = this.firstName;
+        lastName = this.lastName;
+    }
+}
+
+var a = new A{"Johny", "Lawrence"};
+
+// deconstruction, only calls Deconstruct method
+(string firstName, string lastName) = a;
+```
+
+* so ValueTuple doesnt use any black magic, it just has this method Deconstruct(...) which is then called
+
+# LINQ
+* used as a query language on our data structures
+* query language
+    * maps on function calls of LINQ library
+
+* extension methods
+* lazy evaluation - IEnumerable
+
+* the query doesnt actually do anything, it just creates an instance of WhereEnumerable
+    * data structure that describes the query
+    * no computation is done yet!
+
+* this instance remembers:
+    1. the lambda query
+    2. data source
+
+* another part of the query is another instance, this remembers again:
+    1. the lambda query
+    2. data source, the result of the first instance
+
+* example
+```cs
+q = x.Where(p1).Where(p2).Select(x => x + 1);
+```
+
+* (x, p1) <- (Where1, p2) <- (Where2, x => x + 1) <- q
+* each node in this chain implements IEnumerable, so we can iterate over it
+* the computation happens only when we iterate over it
+    * maximum laziness
+
+```cs
+// only now computation happens !
+foreach(var x in q) {
+    ...
+    // GetEnumerator()
+
+    // iteratively
+    // MoveNext()
+    // Current()
+    // this recursively calls GetEnumerator() MoveNext() and Current() in this chain
+}
+```
+* cannot be always lazy
+* eg, OrderBy() cannot be lazy
+* this means, that different queries / different orders can have different efficiency eg OrderBy() can be super slow
