@@ -518,9 +518,207 @@ public void m<T,U>(T t, U u) where T : A where U : T {
 * where T : class
     * reference type
 
+### Impossible constraints
+* there is no constraint, how to make T have some static method
+* example
+```cs
+public struct Complex<T> {
+    T real;
+    T imaginary;
+
+    public static operator +(Complex<T> t1, Complex<T> t2) =>
+        // how to make T to have + operator?
+        new Complex<T>(t1.real + t2.real, t1.imaginary + t2.imaginary);
+}
+```
+
+* there is no way how to do it
+* if double, float, etc ... implemented some interface IArithemitcs
+
+```cs
+public struct Complex<T> where T : IArithmetics {
+    ...
+}
+```
+
+* then our problem would be solved, but this interface doesnt exist (for now, it is in C# source code, but it is commented out)
 
 
+# Interface concrete implementation of method 
+```cs
+public interface IRead {
+    ...
+    public void Close();
+}
 
+public interface IWrite {
+    ...
+    public void Close();
+}
+
+public class TCP : IRead, IWrite {
+    // it's important, there is no public/private in front !
+    void IReader.Close() {
+        // implements IReader close 
+    }
+
+    void IWriter.Close() {
+        // implements IWriter close
+    }
+
+    /// this is unnenecessary
+    public void Close() {
+        // implements both IWriter close and IReader close
+        
+        // this is wrong, recursion
+        // this.Close();
+
+        ((IWriter) this).Close();
+        ((IReader) this).Close();
+    }
+}
+
+// client code
+public void writeAndClose(IWrite writer) {
+    //writes somehow
+    ...
+
+    // closing
+    writer.Close();
+
+    // calls IWriter.Close(), so it only closes writer stream, which is exactly what we wanted
+}
+
+
+TCP connection = new TCP();
+writeAndClose(connection);
+
+// closes both streams
+connection.Close();
+``` 
+
+## Combined with generics
+```cs
+interface I {
+    void m(T x);
+    T m ();
+}
+// A needs to implement both m methods taking int and long and returning int and long - how to do it?
+class A : I<int>, I<long> {
+    // the only way is to use explicit iterface implementation of methods
+
+    public void m(int x) { ... }
+    public void m(long x) { ... }
+
+    public int m() { return 1; }
+    // public long m() {return 2; } // not possible
+
+    int I<long>.m() {return 2; }
+}
+```
+
+# Covariance, Contravariance, Invariance
+## Definition
+* type C is parametrized by T
+```cs
+class C<T> {
+
+}
+
+// or
+string[] array = {"a", "b", "c"};
+// this array is parametrized by string
+```
+
+* type B is compatible with type A
+```cs
+A a = new B(); // is okay
+```
+
+### Covariance by T
+* if both of the above holds and C<B> is compatible with C<A> (can assign C<B> instance to C<A>), then C is covariant by parameter T 
+
+### Contravariance by T
+* if both of the above hold and C<A> is compatible with C<B> (can assign C<A> instance to C<B>), then C is contravariant by parameter T
+
+### Invariant by T
+* is nor covariant or contravariant
+
+## Covariance in C#
+* array of reference types are covariant
+* array of value types on the other hand are invariant
+
+```cs
+object[] a1 = {...};
+string[] a2 = {...};
+
+a1 = a2; // is legal! covariance
+
+Console.Write(a1[0]); // reading is okay
+
+a1[0] = "string"; // if writing the same type, it is still okay but ...
+a1[0] = 1; // note boxing
+
+// this is not okay, because if we for instance later in our code write this:
+
+foreach(string str in a2) {
+    // do something
+    // str from position a2[0] is int, not string, hence a1[0] = 1; results in run time error
+}
+```
+
+### Conclusion
+* read is okay
+* write is not
+* every write access to array costs at least one if (run time check, whether covariance wasnt abused) (in C it doesnt happen)
+    * program can be very slow because of this
+    * how to make it faster?
+        1. make it sealed - that kills any possibility of covariance    
+        2. extremely dirty trick 
+
+```cs
+// declare this struct
+struct X<T> where T : class {
+    private T t;
+
+    public static implicit operator X<T>(T t) {
+        X<T> x;
+        x.t = t;
+        return x;
+    }
+    
+    public static implicit operator T(X<T> x) =>
+        x.t
+}
+
+// this allows freely to convert from our class to this struct parametrized by our class
+
+// client code
+// dont want to make this sealed
+public class A {
+    ...
+}
+
+// instead of iterating array of A, where the run time check occurs, convert it to value type error, this is invariant, hence run time check doesnt happen
+```
+
+## Contravariance in C#
+* read is not okay
+* write is okay
+
+### Why?
+* imagine this compiles
+```cs
+object[] o = {...};
+string[] s = {...};
+
+// imagine arrays are contravariant
+s = o;
+```
+
+* we can write only string to this array (or children, but string is sealed - no children) 
+* hence write is okay, because object can work with strings - there is implicit conversion
+* on the other hand, we cannot read, because we might get something "better" than string, something that is an ancestor of object
 
 
 
