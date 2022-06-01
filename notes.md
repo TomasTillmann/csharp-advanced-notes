@@ -19,7 +19,7 @@ i = (int)l;
 l = i;
 ```
 
-* int doesnt inherit from long => explicit conversion is required
+* int doesnt inherit from long and no implicit conversion is defined => explicit conversion is required
 
 ```cs
 // implicit conversion - but boxing
@@ -149,6 +149,16 @@ IComparable<A> a = (IComparable<A>)new A(3);
 
 // this works
 new A().CompareTo(new A(5));
+
+
+List<A> list = new List<A>();
+list.Append(new A(1)); list.Append(new A(2)); list.Append(new A(3));
+
+// but this doesnt work - run time error
+list.Sort();
+
+
+// sort uses internally CompareTo, but it needs to be the interface implementation of CompareTo, not as an extension method
 ```
 
 ### mutable struct problems
@@ -215,11 +225,11 @@ public static class BExtensions {
 
 
 ## When to use
-1. we would like to add new API to already existing class, that we cannot change
+1. we would like to add new API to already existing class, that we cannot change the already existing class
 
 2. seperation of modules at complex software
 
-3. use instead of hungarian notation
+3. use compactly with "hungarian notation"
 
 ```cs
 // somewhere in program
@@ -231,7 +241,7 @@ position = speed;
 
 ...
 
-// better solution
+// better solution - "hungarian notation on steroids"
 
 struct Speed {
     public float Value;
@@ -376,7 +386,11 @@ b.f(1);
 * in C, it can make more, but it is too complex for real life programs 
 * we should be careful using conversions
 
+
 # Generic methods
+* adds functionality to some family of objects
+* one implementation can be used by many objects (better than copy paste or huge switch)
+
 ```cs
 T f<T>(T t1, T t2) {
 
@@ -404,6 +418,28 @@ T f<T>(T t1, T t2) {
 * this allows creating machine code of concrete specializations at run time, unlike in C, where machine code of concrete specializations has to be known before running
     * JIT vs AOT
 
+## Duck Typing
+* works in C and python with generic methods
+* it means, there is no constraint for the type parameter
+    * in C, because it recompiles every time we want to use concrete specialization, we get the error at compile time
+* in C#, it compiles only once, that would lead to run time errors, hence, we need type constraints (duck typing could be used in C#, dynamic keyword)
+
+## Type Constraints
+```cs
+public T Max<T>(T t1, T t2) where T : IComparable {
+    if(t1.CompareTo(t2)) {
+        return t1;
+    }
+    else {
+        return t2;
+    }
+}
+```
+
+## Generic extension methods
+* work the same as generic methods, becuase extension methods only bring "syntax sugar"
+
+
 ## Remarks
 * we can call generic method without type parameters, than it tries to find the "best match"
     * similiar algorithm of finding the correct method overload    
@@ -411,9 +447,76 @@ T f<T>(T t1, T t2) {
 * when choosing what overload between generic methods and methods to choose, compiler uses still the same algorithm, where generic method is less specific
 
 
+# Generic Types
+* defines a family of types
+
+## How does it work
+* works the same way as in generic methods
+* at CIL code level, there is only one generic class
+* whenever in source code is used (written eg A<int>, note that it doesnt have to be declaration or instantiation!) a concrete specialization of this generic class, the implementation (machine code of this class) is created (JIT) (in C, again, AOT, everything is always recompiled)
+
+### Independence
+* as in generic methods, generic types are completely independent of each other
+
+```cs
+public A<T> : C {
+
+}
+
+// client code
+var a = new A<int>();
+var b = new A<long>();
+
+// not possible
+b = a;
+
+// there is no relationship between these two types, they are completely independednt of each other
+
+// on the other hand,
+C c = a;
+// or
+C c = b;
+
+// is obviously okay
+```
+
+* static types belong to the concrete specialized type 
+* also, static (class) constructors are always called for each specialization (when the first instance is created)
 
 
+# What can be the constraints
+```cs
+public class A<T> where T : IComparable, ISeriazable {
+    ...
+}
 
+// means that T must implement both interfaces
+```
+
+```cs
+public class B<T> where T : new() {
+    ...
+        ... new T();
+}
+
+// T has parameterless constructor
+```
+
+* there is no way how to make T use constructor with parameters
+
+```cs
+public void m<T,U>(T t, U u) where T : A where U : T {
+    ...
+} 
+
+// can constraint a parameter by another constraint
+```
+
+* where T : struct
+    * value type
+
+* where T : class
+    * reference type
 
 
 
