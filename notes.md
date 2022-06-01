@@ -1034,6 +1034,8 @@ int sum = 0;
 list.ForAll(delegate (Node p) {sum += p.value; });
 ```
 
+* just points to a method that is declared "somewhere else"
+
 # Type inference
 * compiler somehow needs to guess what the delegate is going to return
 * always at compile time!
@@ -1052,3 +1054,111 @@ Func<double,int> f3 = x => x + 1; // error, implicit onversion from double to in
 ```cs
 (int a, int b) => a + b;
 ```
+* can be only passed to delegates
+* it's also an anonymous function
+
+```cs
+(int a) => {int b = 5; return a + b + c; }
+```
+
+* c is free/open variable (volna promena)
+
+## Closure
+* lambda function with no free variables
+* c# supports only closures
+    * unlike other languages, that have functions as first class entities
+
+* that means, c# needs to make capture of the free variable
+
+## Capture
+## By Value
+* in C
+    * capture by value
+    * `[=](...) { ... }`
+
+* no problems
+
+## By Reference
+* in C
+    * capture by reference
+    * `[](...) { ... }`
+
+* sometimes, we need to make a life of free variable longer than one run of the function
+    * eg `list.ForEach((int a) => {sum += a; });`
+    * sum needs to be somewhere else
+
+* in C, it is very unsafe
+* the lambda function can be returned, hence the life of this lambda function is longer than the life of a function it was called/declared in!
+* this captured by reference variable then, if it lived in that function is gone (its lifespan has ended) and that memory can be occupied by something else => very unsafe 
+
+
+* in c#, always capture by reference
+
+## How does it work
+* capture by reference only
+* free variables can only be local variables (variables in current method scope)
+    * even if it is a field/property of this instance (local variable this)
+```cs
+public class A {
+    private int x;
+    private int y;
+
+    public Action<int> f(int z) {
+        int a = 3;
+        return () => x + y + z + a;
+    }
+
+    // is on JIT leven translated to
+    public Action<int> f(A this, int z) {
+        int a = 3;
+        return () => this.x + this.y + z + a;
+    }
+
+    // and 'this' is than just a local variable
+}
+
+// at JIT level (conceptually)
+
+// it is not called Scope but something random (anonymous class)
+public class Scope {
+    public A thisA;
+    public int a;
+    public int z;
+
+    // lambda method
+    public void Lambda() {
+        return thisA.x + thisA.y + z + this.a;
+    }
+}
+
+// and the f funciton
+public Action<int> f(int z) {
+    Scope s = new Scope();
+    s.z = z;
+    s.a = 3; 
+
+    Action<int> d = new Action<int>(s.Lambda); 
+    return d;
+}
+```
+
+* this way, lifespan of captured variables is prolonged
+* so even if return the delegate the life of captured variables isnt over
+    * this solution doesnt result in unsafe memory access (like in C)
+
+## Remarks
+* lambda function captures variables, not names!
+
+```cs
+for (int i = 0; i < 10; i++){
+    int j = i;
+    for (int x = j < 20; x++) {
+        int a = x;
+        ...
+    }
+    ...
+}
+```
+
+* few names, but a lot of different variables
+* each current scope has one Scope class
