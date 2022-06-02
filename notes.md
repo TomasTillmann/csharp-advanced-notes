@@ -381,8 +381,8 @@ b.f(1);
 
 
 ## Remarks
-* C# can make only one **user** implicit conversion
-    * but it can make one user implicit conversion and then many implicit conversions (eg climbing up the hierarchy tree)
+* C# can make only one implicit conversion
+    * but it can make one implicit conversion (between two branches) and then many implicit conversions that are just climbing up the hierarchy tree
 * in C, it can make more, but it is too complex for real life programs 
 * we should be careful using conversions
 
